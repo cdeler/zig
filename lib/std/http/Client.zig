@@ -1352,6 +1352,8 @@ pub fn connectTcp(client: *Client, host: []const u8, port: u16, protocol: Connec
     if (protocol == .tls) {
         if (disable_tls) unreachable;
 
+        std.debug.print("FINDME TLS client is initialized\n", .{});
+
         conn.data.tls_client = try client.allocator.create(std.crypto.tls.Client);
         errdefer client.allocator.destroy(conn.data.tls_client);
 
@@ -1520,10 +1522,20 @@ pub fn connect(
     }
 
     if (proxy.supports_connect) tunnel: {
-        return connectTunnel(client, proxy, host, port) catch |err| switch (err) {
+        const tunnel = connectTunnel(client, proxy, host, port) catch |err| switch (err) {
             error.TunnelNotSupported => break :tunnel,
             else => |e| return e,
         };
+
+        std.debug.print("FINDME we are here; it's a tunnel connection\n", .{});
+        std.debug.print("FINDME \n\tclient={any},\n\tproxy={any},\n\thost={s},\n\tport={}\n\n", .{
+            client,
+            proxy,
+            host,
+            port,
+        });
+
+        return tunnel;
     }
 
     // fall back to using the proxy as a normal http proxy
@@ -1657,8 +1669,35 @@ pub fn open(
         }
     }
 
+    std.debug.print(
+        "FINDME open(method = {}, uri = {}, protocol = {})\n",
+        .{
+            method,
+            valid_uri,
+            protocol,
+        },
+    );
+
     const conn = options.connection orelse
         try client.connect(valid_uri.host.?.raw, uriPort(valid_uri, protocol), protocol);
+
+    std.debug.print(
+        "FINDME open(method = {}, uri = {}, protocol = {}) returned a\n",
+        .{
+            method,
+            valid_uri,
+            protocol,
+        },
+    );
+
+    const shouldUpgradeTls = (protocol == .tls);
+
+    if (shouldUpgradeTls) {
+        std.debug.print(
+            "FINDME shouldUpgradeTls={}\n",
+            .{shouldUpgradeTls},
+        );
+    }
 
     var req: Request = .{
         .uri = valid_uri,
